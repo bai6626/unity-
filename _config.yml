@@ -1,0 +1,15 @@
+title: Valorant 复刻日志
+description: 用 Unity 复刻 Valorant 的开发日志
+theme: minima
+lang: zh-CN
+
+# 给这个仓库里所有页面一个默认外观，这样每篇文章不用自己写 layout
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default
+  - scope:
+      path: "docs/blog"
+    values:
+      layout: post
