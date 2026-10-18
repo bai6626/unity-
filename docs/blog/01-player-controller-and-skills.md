@@ -52,7 +52,7 @@ void FixedUpdate()
 
 1. **`sqrMagnitude > 1` 才归一化**。同时按下 `W` 和 `D` 时输入是 `(1,1)`，长度 1.41，不归一化斜着走会快 40%。用 `sqrMagnitude` 是为了少开一次根号（在这个量级纯属自娱自乐，但习惯是好的）。
 2. **竖直速度必须保留**。整条速度被覆盖成 `moveDir * speed` 的话，`y` 会被抹成 0，人永远跳不起来、也永远在下坠和"重置"之间打架。
-3. **覆盖而不是叠加，手感就是"急停"**。松手的那一帧速度立刻归零，没有惯性滑行 —— 这恰好是 Valorant 的手感基调。如果你想做的是《Apex》那类带惯性的移动，就得换成"往目标速度做插值/加速度"，这是两种完全不同的手感方向，一开始就要选。
+3. **覆盖而不是叠加，手感就是"急停"**。松手的那一帧速度立刻归零，没有惯性滑行 —— 如果你想做的是那类带惯性的移动，就得换成"往目标速度做插值/加速度"，这是两种完全不同的手感方向，一开始就要选。
 
 跳跃走的是 `AddForce(..., ForceMode.Impulse)`，一次性给一个向上的冲量（当前 `jumpForce = 10`，跑速 `speed = 8`）：
 
@@ -66,27 +66,7 @@ if (jumpRequested && IsGrounded)
 
 先清 `y` 是为了"什么时候按空格都是同一个跳跃高度"，否则从高处下落的瞬间按跳，冲量会被下落速度吃掉一截。
 
-### 坑 1：地面判定别用"每帧重置的布尔值"
-
-第一版是这么写的：
-
-```csharp
-void FixedUpdate()
-{
-    // ... 移动代码
-    isGrounded = false;          // 每帧先清掉
-}
-
-void OnCollisionStay(Collision col)
-{
-    foreach (ContactPoint c in col.contacts)
-        if (c.normal.y > 0.5f) { isGrounded = true; return; }
-}
-```
-
-看起来是"每帧重置、靠碰撞回调重新置位"，实际上 `OnCollisionStay` 是在物理步**之后**才回调的，所以 `FixedUpdate` 里读到的是上一轮的判定结果。站在稍微陡一点的斜坡上、或者贴着墙的时候，法线 `y` 会掉到 0.5 以下，于是每隔几帧就"假摔"一次 —— 表现就是**站在地上偶尔跳不起来**。
-
-改成记录时间戳而不是布尔值：
+###  **土狼时间（coyote time）**：走出平台边缘后的 0.1 秒内仍然可以起跳，手感会宽容很多。这是那种"玩家永远注意不到，但会提升手感"的细节。
 
 ```csharp
 private float groundedUntil;
@@ -106,18 +86,15 @@ void OnCollisionStay(Collision col)
 }
 ```
 
-顺手白送一个 **土狼时间（coyote time）**：走出平台边缘后的 0.1 秒内仍然可以起跳，手感会宽容很多。这是那种"玩家永远注意不到，但去掉就会被骂"的细节。
 
 ## 四、视角：把"转身"和"抬头"分开
 
-这里有一个必须做对的结构决策：**水平旋转属于身体，垂直俯仰只属于相机。**
-
-如果让身体跟着俯仰一起转，那么低头的时候胶囊体就前倾了，撞击、贴墙、脚步声全乱套。所以 `frist_person_view` 里的分工是：
+实现方式是：**水平旋转属于身体，垂直俯仰只属于相机。**
 
 ```csharp
 void Update()
 {
-    // 用 GetAxisRaw：Mouse X/Y 本身就是"这一帧移动了多少"，不要再乘 Time.deltaTime
+    // 用 GetAxisRaw：Mouse X/Y 本身就是"这一帧移动了多少"，不需要再乘 Time.deltaTime
     float mx = Input.GetAxisRaw("Mouse X") * mouseSensitivity;
     float my = Input.GetAxisRaw("Mouse Y") * mouseSensitivity;
 
@@ -133,28 +110,28 @@ void LateUpdate()
 }
 ```
 
-两个点：
+注意：
 
 - **`LateUpdate` 不是可选项**。如果在 `Update` 里改相机位置，而角色的移动在 `FixedUpdate` 里，就会出现"相机先跟到旧位置、角色再瞬移"的错帧，表现是**低帧率下画面轻微抖动**。放到 `LateUpdate` 就稳定了。
 - **相机是身体的孩子，但位置每帧由脚本算**。所以 `eyeOffset`（眼睛相对身体原点的高度，比如 `(0, 1.6, 0)`）必须自己给，而且 `Start` 里要先摆一次，否则第一帧相机会停在原点。
 
-### 坑 2：鼠标灵敏度乘了 `Time.deltaTime`
+### 坑 1：鼠标灵敏度乘了 `Time.deltaTime`
 
-最初的写法是：
+错误的写法是：
 
 ```csharp
 float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
 ```
 
-`Input.GetAxis("Mouse X")` 返回的已经是"这一帧鼠标移动了多少"（一个增量），再乘 `Time.deltaTime` 等于**又乘了一遍时间**。后果不是"整体变慢"，而是**灵敏度随帧率变化**：60 fps 下乘 0.0167，144 fps 下乘 0.0069，同一款游戏在 144 Hz 显示器上转身速度只有一半多。
+`Input.GetAxis("Mouse X")` 返回的已经是"这一帧鼠标移动了多少"（一个增量），再乘 `Time.deltaTime` 等于**又乘了一遍时间**。后果是**灵敏度随帧率变化**：60 fps 下乘 0.0167，144 fps 下乘 0.0069，同一款游戏在 144 Hz 显示器上转身速度只有一半多。
 
-这种 bug 最阴险的地方是：你在自己的机器上测不出来，玩家一换配置就投诉"鼠标发飘"。判断标准很简单 —— **鼠标输入不乘 `deltaTime`，键盘长按的移动/旋转才乘**。
+这种 bug 最阴险的地方是：你在自己的机器上测不出来，一换配置就"鼠标抽风"。判断标准很简单 —— **鼠标输入不乘 `deltaTime`，键盘长按的移动/旋转才乘**。
 
 （同理，`Input.GetAxis` 自带平滑，`GetAxisRaw` 不带。视角要的是"所见即所得"，所以用 `Raw`。）
 
-### 坑 3：把"每帧位移"当成"速度"
+### 坑 2：把"每帧位移"当成"速度"
 
-这个坑我藏得比较深，因为**它当时看起来是能跑的**。冲刺的实现是每帧给一次速度：
+这个坑藏得比较深，因为**它当时看起来是能跑的**。冲刺的实现是每帧给一次速度：
 
 ```csharp
 while (timer < dashDuration)
@@ -180,8 +157,8 @@ while (timer < dashDuration)
 改法是让代码里的单位回到物理意义，数字也跟着回到人类可读的范围：
 
 ```csharp
-Vector3 v = Dir * dashSpeed;      // dashSpeed 就是米/秒，给 10~13 就够了
-v.y = move.rb.velocity.y;         // 竖直速度不动，所以可以在空中冲刺
+Vector3 v = Dir * dashSpeed;      // dashSpeed 就是米/秒
+v.y = move.rb.velocity.y;         // 竖直速度不动，可以在空中冲刺
 move.rb.velocity = v;
 ```
 
@@ -211,7 +188,7 @@ public class Skill
 }
 ```
 
-只存一个 `lastUseTime`，剩下的全部由属性算出来 —— **不存"剩余冷却"这种会飘的状态**，就不会出现"计时器和 UI 对不上"的经典 bug。`CooldownProgress` 是给 UI 准备的：后面做环形冷却遮罩时，`Image.fillAmount` 直接喂这个值。
+只存一个 `lastUseTime`，剩下的全部由属性算出来 —— **不存"剩余冷却"这种会飘的状态**，就不会出现"计时器和 UI 对不上"的经典 bug。`CooldownProgress` 是给 UI 准备的：`Image.fillAmount` 直接喂这个值。
 
 ### 5.2 整个释放流程
 
@@ -226,7 +203,7 @@ flowchart LR
     D --> E3[C 烟雾弹<br/>生成弹体 → 飞行 → 撞墙停住 → 膨胀]
 ```
 
-入口很朴素，就是一个按键映射表：
+入口很简单，就是一个按键映射表：
 
 ```csharp
 void Update()
@@ -256,7 +233,7 @@ IEnumerator CastSkill1()
 {
     float timer = 0f;
     Vector3 dir = move.moveDir.sqrMagnitude < 0.01f
-        ? move.transform.forward          // 站着不动时朝脸的方向冲
+        ? move.transform.forward          // 兜底站着不动时朝脸的方向冲，没有兜底的话站着不动dir也会有微小的偏移，冲刺方向不可预测
         : move.moveDir.normalized;
 
     move.canMove = false;                 // ← 关键：让 move.cs 别来抢 velocity
@@ -268,7 +245,7 @@ IEnumerator CastSkill1()
             v.y = move.rb.velocity.y;
             move.rb.velocity = v;
             timer += Time.deltaTime;
-            yield return null;            // 每帧放一次手，下一帧接着冲
+            yield return null;            // 每帧放一次，下一帧接着冲
         }
     }
     finally
@@ -278,7 +255,7 @@ IEnumerator CastSkill1()
 }
 ```
 
-`try/finally` 在协程里是有效的：即使外部 `StopCoroutine`，`finally` 也会执行。这样"冲刺完没恢复移动"这类恶性 bug 从结构上就不会发生。
+`try/finally` 非常好用：即使外部 `StopCoroutine`，`finally` 也会执行。这样"冲刺完没恢复移动"这类恶性 bug 从结构上就不会发生。
 
 **Q 升空** —— 先给一个向上的初速度，再靠持续的升力浮空：
 
