@@ -36,7 +36,6 @@
 | # | 标题 | 内容 |
 | --- | --- | --- |
 | 01 | [代码评审：玩家控制与技能](docs/review/01-code-review-player-and-skills.md) | 6 个必须先修的 bug、职责拆分的三条判据、12 个文件的重构示范 |
-| — | [重构示范代码](Assets/RefactorDemo~/README.md) | `Assets/RefactorDemo~/`，Unity 会忽略带 `~` 的文件夹，所以不影响现有场景 |
 
 
 ## 目录
