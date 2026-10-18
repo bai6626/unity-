@@ -1,8 +1,7 @@
 # Valorant 复刻练习
 
-用 Unity 复刻《Valorant》的核心玩法：第一人称射击 + 技能系统。
+用 Unity 复刻 Valorant 的核心玩法：第一人称射击 + 技能系统。
 
-> 目标不是做一个更好的游戏，而是搞清楚"一个能上场的 FPS 角色到底由哪些零件组成"。
 
 ## 当前进度
 
@@ -39,17 +38,6 @@
 | 01 | [代码评审：玩家控制与技能](docs/review/01-code-review-player-and-skills.md) | 6 个必须先修的 bug、职责拆分的三条判据、12 个文件的重构示范 |
 | — | [重构示范代码](Assets/RefactorDemo~/README.md) | `Assets/RefactorDemo~/`，Unity 会忽略带 `~` 的文件夹，所以不影响现有场景 |
 
-## 环境
-
-- Unity **2022.3.62f1c1**
-- 渲染管线：Built-in
-- 输入：旧版 Input Manager（`Input.GetAxis` / `GetKeyDown`）
-
-## 运行
-
-1. 用 Unity 2022.3.62f1c1（或同小版本）打开本目录
-2. 打开 `Assets/1.unity`
-3. Play
 
 ## 目录
 
